@@ -3,7 +3,7 @@ import os
 import hashlib
 import pymupdf
 from sentence_transformers import SentenceTransformer
-from mongo import _mongo_client
+from utils.mongo import _mongo_client
 
 mcp=FastMCP(
     name='My MCP Server'
@@ -29,15 +29,12 @@ def embed_and_upload_pdf(chunks:list):
     db=client['vector-db']
     embeddings_coll=db['embeddings']
     ids=[hashlib.sha256(chunk.encode('utf-8')).hexdigest() for chunk in chunks]
-
+    existing_ids=embeddings_coll.find({'chunk_id':{'$in':ids}},{'chunk_id':1})
+    for id,chunk in zip(ids,chunks):
         embeddings = model.encode(chunk)
         docs.append({'chunk_id':id,'embedding':embeddings.tolist()})
-    
-
     embeddings_coll.insert_many(docs)
     client.close()
-
-
 
 def embed_prompt_and_retrieve(prompt:str)->str:
     model=SentenceTransformer('all-MiniLM-L6-v2')

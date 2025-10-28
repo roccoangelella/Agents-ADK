@@ -1,0 +1,5 @@
+google-adk
+fastmcp
+pymupdf
+sentence_transformers
+pymongo
