@@ -1,4 +1,4 @@
-mcp-server-template
+./mcp-server-template
 venv
 .env
 ./research_agent/.env
