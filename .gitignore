@@ -2,3 +2,5 @@ mcp-server-template
 venv
 .env
 ./research_agent/.env
+PDF
+
