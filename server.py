@@ -28,16 +28,15 @@ def chunk_text(file_path,chunk_size,overlap):
     print('Text Chunked\n---------')
     return chunks
 
-def embed_and_upload_pdf(chunks:list):
+def embed_and_upload_file(chunks:list,embeddings_coll):
     """ A function that returns the content of one or more PDF files as a string, given the folder specified by the user. """    
     model=SentenceTransformer('all-MiniLM-L6-v2')
-    docs=[]
-    client=_mongo_client()
-    db=client['vector-db']
-    embeddings_coll=db['embeddings']
 
+
+
+    docs=[]
     ids=[hashlib.sha256(chunk.encode('utf-8')).hexdigest() for chunk in chunks]
-    existing_ids=[item['_id'] for item in embeddings_coll.find({'chunk_id':{'$in':ids}},{'_id':0,'chunk_id':1})]
+    existing_ids=[item['_id'] for item in embeddings_coll.find({'_id':{'$in':ids}},{'_id':0,'chunk_id':1})]
     print('Ids Ok, for loop deciding which to upload')
     for id,chunk in zip(ids,chunks):
         if id not in existing_ids:
@@ -58,7 +57,6 @@ def embed_and_upload_pdf(chunks:list):
                 ]))
             except StopIteration:
                 redundant_search=None
-            print(redundant_search)
             if not redundant_search or dot(embedding,redundant_search['embedding'])/(norm(embedding)*norm(redundant_search['embedding']))<=0.93:
                 print('Cosine similarity lower than 0.93, appending.')
                 docs.append({'chunk_encoded':encoded,'_id':id,'embedding':embedding.tolist()})
@@ -69,7 +67,6 @@ def embed_and_upload_pdf(chunks:list):
         print('New Embeddings uploaded to mongo')
     else:
         print('No new embeddings')
-    client.close()
 
 def embed_prompt_and_retrieve(prompt:str)->str:
     model=SentenceTransformer('all-MiniLM-L6-v2')
@@ -110,10 +107,22 @@ def scan_folder(folder):
                         text.append(chunk_text(full_file_path,500,50))
     return text
     
-if __name__=='__main__':
-    mcp.run(
-        transport="streamable-http",
-        port=8080,
-        host="127.0.0.1",
-        log_level="INFO"
-    )
+def scan_and_upload(folder):
+    """Groups the folder scan and embedding upload in a single pipeline"""
+    text=scan_folder(folder)
+    print('connecting to mongo...')
+    client=_mongo_client()
+    db=client['vector-db']
+    embeddings_coll=db['embeddings']
+    for chunks in text:
+        embed_and_upload_file(chunks,embeddings_coll)
+
+
+
+# if __name__=='__main__':
+#     mcp.run(
+#         transport="streamable-http",
+#         port=8080,
+#         host="127.0.0.1",
+#         log_level="INFO"
+#     )
