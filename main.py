@@ -1,0 +1,66 @@
+from utils.rag import *
+from utils.mongo import _mongo_client
+
+from fastapi import FastAPI
+from pydantic import BaseModel
+import uvicorn
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+
+from sentence_transformers import SentenceTransformer
+
+import time,os,threading
+
+
+model=SentenceTransformer('all-MiniLM-L6-v2')
+client=_mongo_client()
+
+embeddings_coll=client['vector-db']['embeddings']
+
+app=FastAPI()
+
+class DocumentHandler(FileSystemEventHandler):
+    def __init__(self,model,collection):
+        self.model=model,
+        self.collection=collection
+        self.valid_extensions=('.pdf','.txt','.doc','.docx','.epub','.odt','.pptx')
+    
+    def on_created(self, event):
+        if not event.is_directory:
+            _,extension=os.path.splitext(event.src_path) #event.src_path is the file path
+            if extension.lower() in self.valid_extensions:
+                print(f'New file {event.src_path} detected')
+                time.sleep(5)
+                file_process(event.src_path,self.collection,self.model)
+    
+    def on_modified(self, event):
+        if not event.is_directory:
+            _,extension=os.path.splitext(event.src_path)
+            if extension.lower() in self.valid_extensions:
+                print(f'Modified file {event.src_path} detected')
+                delete_file_chunks(event.src_path,self.collection)
+                time.sleep(5)
+                file_process(event.src_path,self.collection,self.model)
+    
+    def on_deleted(self, event):
+        if not event.is_directory:
+            print(f'Deleted file {event.src_path} detected')
+            delete_file_chunks(event.src_path,self.collection)
+    
+def start_watcher(files_folder):
+    if not os.path.exists(files_folder):
+        print(f'{files_folder} folder not found. Creating it...')
+        os.makedirs(files_folder)
+
+    handler=DocumentHandler(model,embeddings_coll)
+    observer=Observer()
+    observer.schedule(event_filter=handler,path=files_folder,recursive=True)
+    observer.start()
+
+    print(f'{files_folder} is now monitored') 
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()

@@ -1,10 +1,7 @@
 import os
 import hashlib
-import pymupdf
-from sentence_transformers import SentenceTransformer
-from mongo import _mongo_client
-from numpy import dot
-from numpy.linalg import norm
+# from numpy import dot
+# from numpy.linalg import norm
 import zlib
 import base64
 import textract
@@ -23,9 +20,8 @@ def chunk_text(file_path,chunk_size,overlap):
     print('Text Chunked\n---------')
     return chunks
 
-def embed_and_upload_file(chunks:list,embeddings_coll):
+def embed_and_upload_file(chunks:list,embeddings_coll,file_path:str,model):
     """ A function that returns the content of one or more PDF files as a string, given the folder specified by the user. """    
-    model=SentenceTransformer('all-MiniLM-L6-v2')
 
     docs=[]
     ids=[hashlib.sha256(chunk.encode('utf-8')).hexdigest() for chunk in chunks]
@@ -38,35 +34,39 @@ def embed_and_upload_file(chunks:list,embeddings_coll):
             encoded=base64.b64encode(compressed).decode('ascii')
             
             embedding = model.encode(chunk)
-            try:
-                redundant_search=next(embeddings_coll.aggregate([
-                    {"$vectorSearch":{
-                        'index':'vector_index',
-                        'path':'embedding',
-                        'queryVector':embedding.tolist(),
-                        'numCandidates':10,
-                        'limit':1
-                    }}
-                ]))
-            except StopIteration:
-                redundant_search=None
-            if not redundant_search or dot(embedding,redundant_search['embedding'])/(norm(embedding)*norm(redundant_search['embedding']))<=0.93:
-                print('Cosine similarity lower than 0.93, appending.')
-                docs.append({'chunk_encoded':encoded,'_id':id,'embedding':embedding.tolist()})
-            else:
-                print('Very high cosine similarity, rdundant chunk')
+            # try:
+            #     redundant_search=next(embeddings_coll.aggregate([
+            #         {"$vectorSearch":{
+            #             'index':'vector_index',
+            #             'path':'embedding',
+            #             'queryVector':embedding.tolist(),
+            #             'numCandidates':10,
+            #             'limit':1
+            #         }}
+            #     ]))
+            # except StopIteration:
+            #     redundant_search=None
+            # if not redundant_search or dot(embedding,redundant_search['embedding'])/(norm(embedding)*norm(redundant_search['embedding']))<=0.85:
+            #     print('Cosine similarity lower than 0.85, appending.')
+            #     docs.append({'chunk_encoded':encoded,'_id':id,'embedding':embedding.tolist()})
+            # else:
+            #     print('Very high cosine similarity, rdundant chunk')
+
+            docs.append({
+                'chunk_encoded':encoded,
+                '_id':id,
+                'embedding':embedding.tolist(),
+                'source_file':file_path  
+            })
+
     if docs:
         embeddings_coll.insert_many(docs)
         print('New Embeddings uploaded to mongo')
     else:
         print('No new embeddings')
 
-def retrieve(prompt:str)->str:
-    model=SentenceTransformer('all-MiniLM-L6-v2')
+def retrieve(prompt:str,embeddings_coll,model)->str:
     prompt_embedding=model.encode(prompt).tolist()
-    client=_mongo_client()
-    db=client['vector-db']
-    embeddings_coll=db['embeddings']
     vector_search=[
         {"$vectorSearch":{
             'index':'vector_index',
@@ -78,37 +78,38 @@ def retrieve(prompt:str)->str:
         }}
     ]
     results=list(embeddings_coll.aggregate(vector_search))
-    client.close()
     retrieved_chunks=""
     for result in results:
         retrieved_chunks+='\n'+zlib.decompress(base64.b64decode(result['chunk_encoded'])).decode('utf-8')
     return retrieved_chunks
 
-def scan_folder(folder):
-    filenames=os.listdir(f'./{folder}')
-    text=[]
-    for file in filenames:
-        curr_path=f"./{folder}/{file}"
-        if os.path.isfile(curr_path):
-            if file.endswith(('.pdf','.txt','.doc','.docx','.epub','.odt','.pptx')):
-                print(f"Processing file: {curr_path}")
-                text.append(chunk_text(curr_path,500,50))
+def file_process(file_path:str,embeddings_coll,model):
+    print(f"WATCHDOG: Processing file: {file_path}")
+    chunks=chunk_text(file_path, 500, 50)
+    if chunks:
+        embed_and_upload_file(chunks,embeddings_coll,model,file_path)
 
-        if os.path.isdir(curr_path):
-            for dirpath,dirnames,files_in_subdir in os.walk(curr_path):
-                for f_name in files_in_subdir:
-                    if f_name.endswith(('.pdf','.txt','.doc','.docx','.epub','.odt','.pptx')):
-                        full_file_path=f"{dirpath}/{f_name}"
-                        print(f"Processing file in dir: {full_file_path}")
-                        text.append(chunk_text(full_file_path,500,50))
+def scan_folder(folder,embeddings_coll,model,valid_extensions):
+    try:
+        existing_files = set(embeddings_coll.distinct('source_file'))
+        print(f"Found {len(existing_files)} files already in DB.")
+    except Exception as e:
+        print(f"Could not get existing files, will process all. Error: {e}")
+        existing_files = set()
+    
+    text=[]
+    for dirpath,_,files in os.walk(folder):
+            for f_name in files:
+                if f_name.endswith(valid_extensions):
+                    full_path = os.path.join(dirpath, f_name)
+
+                if full_path not in existing_files:
+                    print(f"STARTUP: Found new file: {full_path}")
+                    file_process(full_path,embeddings_coll,model)
     return text
     
-def scan_and_upload(folder):
-    """Groups the folder scan and embedding upload in a single pipeline"""
-    text=scan_folder(folder)
-    print('connecting to mongo...')
-    client=_mongo_client()
-    db=client['vector-db']
-    embeddings_coll=db['embeddings']
-    for chunks in text:
-        embed_and_upload_file(chunks,embeddings_coll)
+def delete_file_chunks(file_path: str, embeddings_coll):
+    """Removes all chunks associated with a specific file."""
+    print(f"WATCHDOG: Deleting chunks for file: {file_path}")
+    result=embeddings_coll.delete_many({'source_file':file_path})
+    print(f"Deleted {result.deleted_count} chunks.")
