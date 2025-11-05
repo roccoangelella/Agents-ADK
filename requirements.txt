@@ -3,3 +3,6 @@ fastmcp
 pymupdf
 sentence_transformers
 pymongo
+motor
+fastapi
+watchdog

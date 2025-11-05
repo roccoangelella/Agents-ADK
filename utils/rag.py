@@ -5,6 +5,8 @@ import hashlib
 import zlib
 import base64
 import textract
+from utils.mongo import _mongo_client
+from sentence_transformers import SentenceTransformer
 
 def chunk_text(file_path,chunk_size,overlap):
     try:
@@ -65,7 +67,10 @@ def embed_and_upload_file(chunks:list,embeddings_coll,file_path:str,model):
     else:
         print('No new embeddings')
 
-def retrieve(prompt:str,embeddings_coll,model)->str:
+def retrieve(prompt:str)->str:
+    client=_mongo_client()
+    embeddings_coll=client['vector-db']['embeddings']
+    model=SentenceTransformer('all-MiniLM-L6-v2')
     prompt_embedding=model.encode(prompt).tolist()
     vector_search=[
         {"$vectorSearch":{
@@ -87,7 +92,7 @@ def file_process(file_path:str,embeddings_coll,model):
     print(f"WATCHDOG: Processing file: {file_path}")
     chunks=chunk_text(file_path, 500, 50)
     if chunks:
-        embed_and_upload_file(chunks,embeddings_coll,model,file_path)
+        embed_and_upload_file(chunks,embeddings_coll,file_path,model)
 
 def scan_folder(folder,embeddings_coll,model,valid_extensions):
     try:
