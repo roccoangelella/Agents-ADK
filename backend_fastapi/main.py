@@ -54,7 +54,7 @@ def start_watcher(files_folder):
         print(f'{files_folder} folder not found. Creating it...')
         os.makedirs(files_folder)
 
-    handler=DocumentHandler(model,embeddings_coll_async)
+    handler=DocumentHandler(model,embeddings_coll)
     observer=Observer()
     observer.schedule(handler,path=files_folder,recursive=True)
     observer.start()
