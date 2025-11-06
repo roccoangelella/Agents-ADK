@@ -85,8 +85,9 @@ def retrieve(prompt: str, source_file: str | None = None) -> str:
     }
     if source_file:
         vector_search_stage["$vectorSearch"]["filter"] = {
-            "source_file": source_file
+            "source_file": f"./DOCS\{source_file}"
         }
+
     pipeline = [vector_search_stage]
     results = list(embeddings_coll.aggregate(pipeline))
 
