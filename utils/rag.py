@@ -69,25 +69,38 @@ def embed_and_upload_file(chunks:list,embeddings_coll,file_path:str,model):
     else:
         print('No new embeddings')
 
-def retrieve(prompt:str)->str:
-    client=_mongo_client()
-    embeddings_coll=client['vector-db']['embeddings']
-    model=SentenceTransformer('all-MiniLM-L6-v2')
-    prompt_embedding=model.encode(prompt).tolist()
-    vector_search=[
-        {"$vectorSearch":{
-            'index':'vector_index',
-            'path':'embedding',
-            'queryVector':prompt_embedding,
-            'numCandidates':100,
-            'limit':5
+def retrieve(prompt: str, source_file: str | None = None) -> str:
+    client = _mongo_client()
+    embeddings_coll = client['vector-db']['embeddings']
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+    prompt_embedding = model.encode(prompt).tolist()
+    vector_search_stage = {
+        "$vectorSearch": {
+            'index': 'vector_index',
+            'path': 'embedding',
+            'queryVector': prompt_embedding,
+            'numCandidates': 100,
+            'limit': 5
+        }
+    }
+    if source_file:
+        vector_search_stage["$vectorSearch"]["filter"] = {
+            "source_file": source_file
+        }
+    pipeline = [vector_search_stage]
+    results = list(embeddings_coll.aggregate(pipeline))
 
-        }}
-    ]
-    results=list(embeddings_coll.aggregate(vector_search))
     retrieved_chunks=""
     for result in results:
-        retrieved_chunks+='\n'+zlib.decompress(base64.b64decode(result['chunk_encoded'])).decode('utf-8')
+        if 'chunk_encoded' in result:
+            try:
+                decoded_chunk = zlib.decompress(base64.b64decode(result['chunk_encoded'])).decode('utf-8')
+                retrieved_chunks += '\n' + decoded_chunk
+            except (zlib.error, base64.binascii.Error, UnicodeDecodeError) as e:
+                print(f"Error decoding chunk for result {result.get('_id')}: {e}")
+        else:
+            print(f"Result {result.get('_id')} missing 'chunk_encoded' field.")
+
     return retrieved_chunks
 
 def file_process(file_path:str,embeddings_coll,model):

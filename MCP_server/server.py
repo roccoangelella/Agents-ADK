@@ -5,13 +5,16 @@ mcp=FastMCP(
 )
 
 @mcp.tool()
-def _retrieve(prompt:str):
-    """ Calls a retrieval function to retrieve files content from vector db """
+def _retrieve(prompt: str):
+    """
+    Retrieves relevant text chunks from a vector database 
+    based on the user's prompt. Use this tool to find specific 
+    information to answer a question.
+    """
     chunks_text=""
     for chunk in retrieve(prompt):
         chunks_text+=chunk
     return chunks_text
-
 if __name__=='__main__':
     mcp.run(
         transport="streamable-http",
