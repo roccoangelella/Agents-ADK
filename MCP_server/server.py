@@ -1,5 +1,6 @@
 from fastmcp import FastMCP
 from utils.rag import retrieve
+from pathlib import Path
 import os
 
 mcp=FastMCP(
@@ -7,14 +8,14 @@ mcp=FastMCP(
 )
 
 @mcp.tool()
-def retrieve_text(prompt: str)->str:
+def retrieve_text(prompt: str,filename:str)->str:
     """
     Retrieves relevant text chunks from a vector database 
     based on the user's prompt. Use this tool to find specific 
     information to answer a question.
     """
     chunks_text=""
-    for chunk in retrieve(prompt):
+    for chunk in retrieve(prompt,filename):
         chunks_text+=chunk
     return chunks_text
 
@@ -25,14 +26,14 @@ def search_file_name()->list[str]:
     Launch only if the user specified a file name or explicitly mentioned a file in his prompt, as this list will be used by the LLM to select the correct file.
     """
     filenames=[]
-    for dirpath,_,files in list(os.walk('./DOCS')):
+    for dirpath,_,files in list(os.walk('DOCS')):
         for file in files:
             if file.endswith(('.pdf','.txt','.doc','.docx','.epub','.odt','.pptx')):
                 full_path=os.path.join(dirpath, file)
-                norm_full_path=full_path.replace(os.path.sep, '/')
-                filenames.append(norm_full_path)
+                full_path=Path(full_path).as_posix()
+                filenames.append(full_path)
     if not filenames:
-        print("[Debug] No files found in ./DOCS directory.")
+        print("[Debug] No files found in DOCS directory.")
         return []
     return filenames
 

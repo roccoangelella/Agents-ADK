@@ -69,10 +69,10 @@ def start_watcher(files_folder):
 
 @app.on_event('startup')
 def on_startup():
-    scan_folder('./DOCS',embeddings_coll,model,('.pdf','.txt','.doc','.docx','.epub','.odt','.pptx')) 
+    scan_folder('DOCS',embeddings_coll,model,('.pdf','.txt','.doc','.docx','.epub','.odt','.pptx')) 
     watcher_thread=threading.Thread(
         target=start_watcher,
-        args=('./DOCS',),
+        args=('DOCS',),
         daemon=True
     )    
     watcher_thread.start()

@@ -26,7 +26,7 @@ def chunk_text(file_path,chunk_size,overlap):
 
 def embed_and_upload_file(chunks:list,embeddings_coll,file_path:str,model):
     """ A function that returns the content of one or more PDF files as a string, given the folder specified by the user. """    
-
+    file_path = file_path.replace('\\', '/')
     docs=[]
     ids=[hashlib.sha256(chunk.encode('utf-8')).hexdigest() for chunk in chunks]
     existing_ids=[item['_id'] for item in embeddings_coll.find({'_id':{'$in':ids}},{'_id':1,'chunk_id':1})]
@@ -69,7 +69,7 @@ def embed_and_upload_file(chunks:list,embeddings_coll,file_path:str,model):
     else:
         print('No new embeddings')
 
-def retrieve(prompt: str, source_file: str | None = None) -> str:
+def retrieve(prompt: str, source_file: str|None=None) -> str:
     client = _mongo_client()
     embeddings_coll = client['vector-db']['embeddings']
     model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -85,7 +85,7 @@ def retrieve(prompt: str, source_file: str | None = None) -> str:
     }
     if source_file:
         vector_search_stage["$vectorSearch"]["filter"] = {
-            "source_file": f"./DOCS\{source_file}"
+            "source_file": source_file
         }
 
     pipeline = [vector_search_stage]
@@ -123,7 +123,7 @@ def scan_folder(folder,embeddings_coll,model,valid_extensions):
             for f_name in files:
                 if f_name.endswith(valid_extensions):
                     full_path = os.path.join(dirpath, f_name)
-
+                    full_path = full_path.replace('\\', '/')    
                 if full_path not in existing_files:
                     print(f"STARTUP: Found new file: {full_path}")
                     file_process(full_path,embeddings_coll,model)
@@ -131,6 +131,7 @@ def scan_folder(folder,embeddings_coll,model,valid_extensions):
     
 def delete_file_chunks(file_path: str, embeddings_coll):
     """Removes all chunks associated with a specific file."""
+    file_path = file_path.replace('\\', '/')
     print(f"WATCHDOG: Deleting chunks for file: {file_path}")
     result=embeddings_coll.delete_many({'source_file':file_path})
     print(f"Deleted {result.deleted_count} chunks.")
