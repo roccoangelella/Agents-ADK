@@ -40,15 +40,15 @@ class DocumentHandler(FileSystemEventHandler):
             _,extension=os.path.splitext(event.src_path)
             if extension.lower() in self.valid_extensions:
                 print(f'Modified file {event.src_path} detected')
-                self.loop.run_until_complete(delete_file_chunks(event.src_path,self.collection))
+                delete_file_chunks(event.src_path, self.collection)
                 time.sleep(5)
                 self.loop.run_until_complete(file_process(event.src_path,self.collection,self.model))
     
     def on_deleted(self, event):
         if not event.is_directory:
             print(f'Deleted file {event.src_path} detected')
-            self.loop.run_until_complete(delete_file_chunks(event.src_path,self.collection))
-    
+            delete_file_chunks(event.src_path, self.collection)
+
 def start_watcher(files_folder):
     if not os.path.exists(files_folder):
         print(f'{files_folder} folder not found. Creating it...')
@@ -86,12 +86,4 @@ def api_retrieve(query):
     retrieved=retrieve(query,embeddings_coll,model)
     return {'context':retrieved}
 
-if __name__=='__main__':
-    print('Starting fastAPI server...')
-    uvicorn.run(
-        "main:app", 
-        host="0.0.0.0", 
-        port=8000, 
-        reload=True,
-        reload_excludes=['./DOCS']
-    )
+#uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude ./DOCS

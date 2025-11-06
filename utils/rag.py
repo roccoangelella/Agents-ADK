@@ -7,20 +7,22 @@ import base64
 import textract
 from utils.mongo import _mongo_client
 from sentence_transformers import SentenceTransformer
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+import re
 
 def chunk_text(file_path,chunk_size,overlap):
     try:
         text=textract.process(file_path).decode('utf-8')
     except Exception as e:
         print(f"Error extracting text from {file_path}: {e}")
-        text = ""
-    chunks=[]
-    start=0
-    while start<len(text):
-        chunks.append(text[start:start+chunk_size])
-        start+=(chunk_size-overlap)
-    print('Text Chunked\n---------')
-    return chunks
+        text=""
+    splitter=RecursiveCharacterTextSplitter(
+    separators=["\n\n", "\n", " ", ""],  
+    chunk_size=chunk_size,
+    chunk_overlap=overlap)
+
+    return splitter.split_text(text)
+
 
 def embed_and_upload_file(chunks:list,embeddings_coll,file_path:str,model):
     """ A function that returns the content of one or more PDF files as a string, given the folder specified by the user. """    
@@ -77,7 +79,7 @@ def retrieve(prompt:str)->str:
             'index':'vector_index',
             'path':'embedding',
             'queryVector':prompt_embedding,
-            'numCandidates':10,
+            'numCandidates':100,
             'limit':5
 
         }}
@@ -90,7 +92,7 @@ def retrieve(prompt:str)->str:
 
 def file_process(file_path:str,embeddings_coll,model):
     print(f"WATCHDOG: Processing file: {file_path}")
-    chunks=chunk_text(file_path, 500, 50)
+    chunks=chunk_text(file_path, 1000, 100)
     if chunks:
         embed_and_upload_file(chunks,embeddings_coll,file_path,model)
 
