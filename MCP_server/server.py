@@ -19,7 +19,7 @@ def retrieve_text(prompt: str)->str:
     return chunks_text
 
 @mcp.tool()
-def search_file_name(prompt:str)->list[str]:
+def search_file_name()->list[str]:
     """
     Gets a list of all available file paths from the DOCS folder.
     Launch only if the user specified a file name or explicitly mentioned a file in his prompt, as this list will be used by the LLM to select the correct file.
@@ -39,7 +39,7 @@ def search_file_name(prompt:str)->list[str]:
 if __name__=='__main__':
     mcp.run(
         transport="streamable-http",
-        port=8080,
+        port=8081,
         host="127.0.0.1",
         log_level="INFO"
     )

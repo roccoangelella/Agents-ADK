@@ -86,4 +86,4 @@ def api_retrieve(query):
     retrieved=retrieve(query,embeddings_coll,model)
     return {'context':retrieved}
 
-#uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude ./DOCS
+#uvicorn backend_fastapi.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude ./DOCS
