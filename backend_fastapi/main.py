@@ -1,9 +1,10 @@
 import asyncio
 
-from utils.rag import *
+from utils.rag import retrieve, file_process, delete_file_chunks, scan_folder
 from utils.mongo import _mongo_client
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 from watchdog.observers import Observer
@@ -11,14 +12,43 @@ from watchdog.events import FileSystemEventHandler
 
 from sentence_transformers import SentenceTransformer
 
-import time,os,threading
+import time
+import os
+import threading
 
 model=SentenceTransformer('all-MiniLM-L6-v2')
 client=_mongo_client()
 
 embeddings_coll=client['vector-db']['embeddings']
 
-app=FastAPI()
+app = FastAPI()
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:5174"],  # Add your frontend URLs
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+# Message model
+class Message(BaseModel):
+    message: str
+
+@app.post("/chat")
+async def chat(message: Message):
+    try:
+        # Use your existing retrieve function
+        response = retrieve(message.message, embeddings_coll, model)
+        return {"response": response}
+    except Exception as e:
+        return {"response": f"Error: {str(e)}"}
 
 class DocumentHandler(FileSystemEventHandler):
     def __init__(self,model,collection):
