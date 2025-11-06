@@ -105,6 +105,7 @@ def retrieve(prompt: str, source_file: str|None=None) -> str:
     return retrieved_chunks
 
 def file_process(file_path:str,embeddings_coll,model):
+    file_path = file_path.replace('\\', '/')
     print(f"WATCHDOG: Processing file: {file_path}")
     chunks=chunk_text(file_path, 1000, 100)
     if chunks:

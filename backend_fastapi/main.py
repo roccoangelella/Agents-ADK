@@ -25,7 +25,6 @@ class DocumentHandler(FileSystemEventHandler):
         self.model=model
         self.collection=collection
         self.valid_extensions=('.pdf','.txt','.doc','.docx','.epub','.odt','.pptx')
-        self.loop=asyncio.new_event_loop()
     
     def on_created(self, event):
         if not event.is_directory:
@@ -33,7 +32,7 @@ class DocumentHandler(FileSystemEventHandler):
             if extension.lower() in self.valid_extensions:
                 print(f'New file {event.src_path} detected')
                 time.sleep(5)
-                self.loop.run_until_complete(file_process(event.src_path,self.collection,self.model))
+                file_process(event.src_path,self.collection,self.model)
     
     def on_modified(self, event):
         if not event.is_directory:
@@ -42,7 +41,7 @@ class DocumentHandler(FileSystemEventHandler):
                 print(f'Modified file {event.src_path} detected')
                 delete_file_chunks(event.src_path, self.collection)
                 time.sleep(5)
-                self.loop.run_until_complete(file_process(event.src_path,self.collection,self.model))
+                file_process(event.src_path,self.collection,self.model)
     
     def on_deleted(self, event):
         if not event.is_directory:
